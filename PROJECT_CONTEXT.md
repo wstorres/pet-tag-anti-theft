@@ -69,7 +69,8 @@ pet-tag-anti-theft/
 ├── infrastructure/          # IaC (Serverless Framework / SAM)
 └── docs/                    # Manuais funcionais e especificações
 
-5. Diretrizes de Código e Padrões de Manutenção
+## 5. Diretrizes de Código e Padrões de Manutenção
+
 Eficiência e Latência: Mantenha os arquivos Lambda enxutos. O handler scan_tag.py deve responder em menos de 500ms para garantir que a localização e o log sejam capturados antes do utilizador fechar a página.
 
 Segurança e Privacidade: Nenhum dado pessoal sensível do tutor deve ser exposto publicamente sem consentimento. O perfil público deve exibir apenas o nome do pet, alertas de saúde e botões de contacto direto.

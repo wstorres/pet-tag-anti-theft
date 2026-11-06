@@ -1,0 +1,57 @@
+service: pet-tag-anti-theft
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: python3.11
+  region: us-east-1
+  environment:
+    PETS_TABLE: ${self:service}-pets-${sls:stage}
+    TAGS_TABLE: ${self:service}-tags-${sls:stage}
+    LOGS_TABLE: ${self:service}-logs-${sls:stage}
+
+resources:
+  Resources:
+    # 1. Tabela de Pets
+    PetsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:service}-pets-${sls:stage}
+        AttributeDefinitions:
+          - AttributeName: pet_id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: pet_id
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+
+    # 2. Tabela de Tags
+    TagsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:service}-tags-${sls:stage}
+        AttributeDefinitions:
+          - AttributeName: tag_id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: tag_id
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+
+    # 3. Tabela de Logs de Acesso (Anti-Apropriação)
+    AccessLogsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:service}-logs-${sls:stage}
+        AttributeDefinitions:
+          - AttributeName: tag_id
+            AttributeType: S
+          - AttributeName: timestamp
+            AttributeType: S
+        KeySchema:
+          - AttributeName: tag_id
+            KeyType: HASH
+          - AttributeName: timestamp
+            KeyType: RANGE
+        BillingMode: PAY_PER_REQUEST
