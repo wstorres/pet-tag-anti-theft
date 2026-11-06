@@ -11,6 +11,23 @@ provider:
     TAGS_TABLE: ${self:service}-tags-${sls:stage}
     LOGS_TABLE: ${self:service}-logs-${sls:stage}
 
+functions:
+  scanTag:
+    handler: backend/handlers/scan_tag.lambda_handler
+    events:
+      - http:
+          path: p/{tag_id}
+          method: get
+          cors: true
+
+  registerPet:
+    handler: backend/handlers/register_pet.lambda_handler
+    events:
+      - http:
+          path: pet/register
+          method: post
+          cors: true    
+
 resources:
   Resources:
     # 1. Tabela de Pets
