@@ -26,7 +26,15 @@ functions:
       - http:
           path: pet/register
           method: post
-          cors: true    
+          cors: true  
+
+  getPetInfo:
+    handler: backend/handlers/get_pet_info.lambda_handler
+    events:
+      - http:
+          path: pet/info/{tag_id}
+          method: get
+          cors: true          
 
 resources:
   Resources:
