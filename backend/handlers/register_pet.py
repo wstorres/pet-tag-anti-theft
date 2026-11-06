@@ -14,7 +14,8 @@ TAGS_TABLE_NAME = os.environ.get('TAGS_TABLE', 'pet-tag-anti-theft-tags-dev')
 
 def lambda_handler(event, context):
     """
-    Cadastra o perfil do pet e vincula a tag comprada ao animal.
+    Cadastra o perfil do pet e vincula a tag comprada ao animal,
+    validando previamente se a tag é autorizada (Whitelist) e está VIRGIN.
     """
     try:
         body = json.loads(event.get('body', '{}'))
@@ -38,37 +39,61 @@ def lambda_handler(event, context):
             "body": json.dumps({"error": "Campos obrigatórios: tag_id, pet_name e owner_phone."})
         }
     
-    pet_id = f"pet_{uuid.uuid4().hex[:8]}"
-    created_at = datetime.datetime.utcnow().isoformat()
-    
     pets_table = dynamodb.Table(PETS_TABLE_NAME)
     tags_table = dynamodb.Table(TAGS_TABLE_NAME)
     
-    pet_item = {
-        "pet_id": pet_id,
-        "tag_id": tag_id,
-        "pet_name": pet_name,
-        "species": species,
-        "owner_name": owner_name,
-        "owner_phone": owner_phone,
-        "owner_email": owner_email,
-        "medical_notes": medical_notes,
-        "is_lost": False,
-        "created_at": created_at
-    }
-    
-    tag_item = {
-        "tag_id": tag_id,
-        "status": "ACTIVE",
-        "bound_pet_id": pet_id,
-        "updated_at": created_at
-    }
-    
     try:
-        pets_table.put_item(Item=pet_item)
-        tags_table.put_item(Item=tag_item)
+        # 1. Trava de Segurança: Verificar se a Tag existe na Whitelist de Fabricação
+        tag_response = tags_table.get_item(Key={"tag_id": tag_id})
+        tag_item = tag_response.get("Item")
         
-        logger.info(f"Pet {pet_name} cadastrado com sucesso e vinculado à tag {tag_id}")
+        if not tag_item:
+            logger.warning(f"Tentativa de cadastro com tag não autorizada/inexistente: {tag_id}")
+            return {
+                "statusCode": 403,
+                "headers": {"Content-Type": "application/json", "Access-Control-Allow-Origin": "*"},
+                "body": json.dumps({"error": "Tag inválida ou não autorizada pelo fabricante."})
+            }
+        
+        # 2. Verificar se a tag já foi ativada anteriormente
+        if tag_item.get("status") != "VIRGIN":
+            logger.warning(f"Tentativa de reutilização de tag já ativa: {tag_id}")
+            return {
+                "statusCode": 400,
+                "headers": {"Content-Type": "application/json", "Access-Control-Allow-Origin": "*"},
+                "body": json.dumps({"error": "Esta tag já se encontra ativa ou bloqueada no sistema."})
+            }
+        
+        # 3. Processo de Cadastro
+        pet_id = f"pet_{uuid.uuid4().hex[:8]}"
+        created_at = datetime.datetime.utcnow().isoformat()
+        
+        pet_item = {
+            "pet_id": pet_id,
+            "tag_id": tag_id,
+            "pet_name": pet_name,
+            "species": species,
+            "owner_name": owner_name,
+            "owner_phone": owner_phone,
+            "owner_email": owner_email,
+            "medical_notes": medical_notes,
+            "is_lost": False,
+            "created_at": created_at
+        }
+        
+        # Atualiza o status da tag para ACTIVE e vincula ao pet
+        updated_tag_item = {
+            "tag_id": tag_id,
+            "status": "ACTIVE",
+            "bound_pet_id": pet_id,
+            "updated_at": created_at
+        }
+        
+        # Salva as informações nas respectivas tabelas
+        pets_table.put_item(Item=pet_item)
+        tags_table.put_item(Item=updated_tag_item)
+        
+        logger.info(f"Pet {pet_name} cadastrado com sucesso e tag {tag_id} ativada.")
         
         return {
             "statusCode": 201,
@@ -78,14 +103,16 @@ def lambda_handler(event, context):
             },
             "body": json.dumps({
                 "status": "success",
-                "message": "Pet cadastrado e tag ativada com sucesso!",
+                "message": "Pet cadastrado e tag ativada com segurança!",
                 "pet_id": pet_id,
                 "tag_id": tag_id
             })
         }
+        
     except Exception as e:
-        logger.error(f"Erro ao cadastrar pet no DynamoDB: {str(e)}")
+        logger.error(f"Erro crítico ao processar o cadastro: {str(e)}")
         return {
             "statusCode": 500,
-            "body": json.dumps({"error": "Erro ao salvar no banco de dados."})
+            "headers": {"Content-Type": "application/json", "Access-Control-Allow-Origin": "*"},
+            "body": json.dumps({"error": "Erro interno ao processar o cadastro na nuvem."})
         }
